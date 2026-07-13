@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Huonekalukyselyn yhteenveto</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="container">
+    <div class="card">
+      <h1>Huonekalukyselyn yhteenveto</h1>
+      <p class="no-print">Tässä näkyvät Kallen ja Leilan viimeksi tallentamat vastaukset.</p>
+      <div class="actions no-print">
+        <button class="primary" id="print">Tulosta vastaukset</button>
+        <button class="secondary" id="refresh">Päivitä</button>
+        <button class="danger" id="clear">Tyhjennä vastaukset</button>
+      </div>
+      <div id="status" class="status"></div>
+    </div>
+    <div id="content" class="loading">Ladataan…</div>
+  </main>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
