@@ -1,85 +1,15 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config.js";
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-const token = new URLSearchParams(location.search).get("token");
-const content = document.querySelector("#content");
-const status = document.querySelector("#status");
-
-function setStatus(message, type = "") {
-  status.textContent = message;
-  status.className = `status ${type}`;
-}
-
-function escapeHtml(value = "") {
-  return String(value).replace(/[&<>"']/g, c => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
-  }[c]));
-}
-
-function answerText(value) {
-  if (value === true) return '<span class="interested">Kiinnostunut</span>';
-  if (value === false) return "Ei";
-  return '<span class="muted">Ei vastausta</span>';
-}
-
-async function loadSummary() {
-  if (!token) {
-    content.innerHTML = '<div class="card error">Admin-linkistä puuttuu tunniste.</div>';
-    return;
-  }
-
-  const { data, error } = await supabase.rpc("get_admin_summary", { p_token: token });
-  if (error || !data?.items) {
-    console.error(error);
-    content.innerHTML = '<div class="card error">Admin-linkki ei ole voimassa tai tietoja ei voitu ladata.</div>';
-    return;
-  }
-
-  content.className = "table-wrap";
-  content.innerHTML = `
-    <table>
-      <thead>
-        <tr>
-          <th>Huonekalu</th>
-          <th>Kalle</th>
-          <th>Kallen kommentti</th>
-          <th>Leila</th>
-          <th>Leilan kommentti</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${data.items.map(item => `
-          <tr>
-            <td><strong>${escapeHtml(item.name)}</strong></td>
-            <td>${answerText(item.kalle_interested)}</td>
-            <td>${escapeHtml(item.kalle_comment || "")}</td>
-            <td>${answerText(item.leila_interested)}</td>
-            <td>${escapeHtml(item.leila_comment || "")}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>`;
-}
-
-document.querySelector("#print").addEventListener("click", () => window.print());
-document.querySelector("#refresh").addEventListener("click", loadSummary);
-
-document.querySelector("#clear").addEventListener("click", async () => {
-  const confirmed = confirm("Haluatko varmasti poistaa kaikki Kallen ja Leilan vastaukset?");
-  if (!confirmed) return;
-
-  const secondConfirm = confirm("Poistoa ei voi perua. Tyhjennetäänkö vastaukset?");
-  if (!secondConfirm) return;
-
-  const { data, error } = await supabase.rpc("clear_all_responses", { p_token: token });
-  if (error || data !== true) {
-    console.error(error);
-    setStatus("Vastausten tyhjentäminen epäonnistui.", "error");
-    return;
-  }
-  setStatus("Kaikki vastaukset on tyhjennetty.", "success");
-  await loadSummary();
-});
-
-loadSummary();
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';import {SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY} from './config.js';
+const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY),token=new URLSearchParams(location.search).get('token');let items=[],filter='all';const el=document.querySelector('#adminItems'),msg=document.querySelector('#adminStatus');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));const src=i=>i.image_data_url||i.image_path||'';
+function category(i){if(i.kalle_interested===true&&i.leila_interested===true)return'conflict';if(i.kalle_interested===true||i.leila_interested===true)return'clear';return'none'}
+function statusText(i){const c=category(i);if(c==='conflict')return'Molemmat haluavat';if(c==='clear')return i.kalle_interested===true?'Vain Kalle haluaa':'Vain Leila haluaa';return'Ei kiinnostuneita'}
+function visible(i){if(filter==='all')return true;if(filter==='decided')return i.final_owner&&i.final_owner!=='Ei päätetty';if(filter==='open')return!i.final_owner||i.final_owner==='Ei päätetty';return category(i)===filter}
+function render(){const c={conflict:0,clear:0,none:0,decided:0};items.forEach(i=>{c[category(i)]++;if(i.final_owner&&i.final_owner!=='Ei päätetty')c.decided++});stats.innerHTML=`<span class="stat">${items.length} huonekalua</span><span class="stat">🟡 ${c.conflict} keskusteltavaa</span><span class="stat">🟢 ${c.clear} selvää</span><span class="stat">⚪ ${c.none} ei kiinnostuneita</span><span class="stat">✓ ${c.decided} päätetty</span>`;
+ el.innerHTML=items.filter(visible).map(i=>`<article class="card admin-card" data-id="${i.id}"><img src="${esc(src(i))}" alt="${esc(i.name)}"><div><h2>${esc(i.name)}</h2><span class="status-badge ${category(i)}">${statusText(i)}</span><div class="responses"><div class="response"><strong>Kalle:</strong> ${i.kalle_interested===true?'Haluaa':i.kalle_interested===false?'Ei halua':'Ei vastausta'}<br>${esc(i.kalle_comment||'')}</div><div class="response"><strong>Leila:</strong> ${i.leila_interested===true?'Haluaa':i.leila_interested===false?'Ei halua':'Ei vastausta'}<br>${esc(i.leila_comment||'')}</div></div><label>Lopullinen päätös<select class="owner"><option>Ei päätetty</option>${['Kalle','Leila','Myydään','Lahjoitetaan','Kierrätys'].map(x=>`<option ${i.final_owner===x?'selected':''}>${x}</option>`).join('')}</select></label><div class="admin-actions no-print"><button class="edit">Muokkaa</button><button class="delete danger">Poista</button></div></div></article>`).join('');
+ document.querySelectorAll('.admin-card').forEach(card=>{const i=items.find(x=>x.id===Number(card.dataset.id));card.querySelector('.owner').onchange=async e=>{await supabase.rpc('admin_set_final_owner',{p_token:token,p_furniture_id:i.id,p_final_owner:e.target.value});i.final_owner=e.target.value;render()};card.querySelector('.edit').onclick=()=>openEdit(i);card.querySelector('.delete').onclick=()=>removeItem(i)});}
+async function load(){const {data,error}=await supabase.rpc('get_admin_summary',{p_token:token});if(error||!data){el.innerHTML='<div class="card">Admin-linkki ei ole voimassa.</div>';return}items=data.items;render()}
+function openEdit(i=null){editTitle.textContent=i?'Muokkaa huonekalua':'Lisää huonekalu';editId.value=i?.id||'';editName.value=i?.name||'';editDescription.value=i?.description||'';editOrder.value=i?.sort_order||items.length+1;editImage.value='';editDialog.showModal()}
+function fileToDataUrl(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
+saveItemBtn.onclick=async()=>{if(!editName.value.trim())return;msg.textContent='Tallennetaan…';let image=null;if(editImage.files[0]){if(editImage.files[0].size>4_000_000){msg.textContent='Kuva on liian suuri (maks. 4 Mt).';return}image=await fileToDataUrl(editImage.files[0])}const {data,error}=await supabase.rpc('admin_upsert_furniture',{p_token:token,p_id:editId.value?Number(editId.value):null,p_name:editName.value.trim(),p_description:editDescription.value.trim(),p_sort_order:Number(editOrder.value),p_image_data_url:image});if(error||!data){msg.textContent='Tallennus epäonnistui';return}editDialog.close();msg.textContent='Tallennettu';await load()}
+async function removeItem(i){if(!confirm(`Poistetaanko ${i.name}? Myös sen vastaukset poistuvat.`))return;const {data}=await supabase.rpc('admin_delete_furniture',{p_token:token,p_furniture_id:i.id});if(data===true)load()}
+addBtn.onclick=()=>openEdit();printBtn.onclick=()=>window.print();refreshBtn.onclick=load;clearBtn.onclick=async()=>{if(confirm('Tyhjennetäänkö kaikki Kallen ja Leilan vastaukset?')&&confirm('Poistoa ei voi perua. Jatketaanko?')){await supabase.rpc('clear_all_responses',{p_token:token});load()}};document.querySelectorAll('.filters button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.filters button').forEach(x=>x.classList.remove('active'));b.classList.add('active');filter=b.dataset.filter;render()});load();
